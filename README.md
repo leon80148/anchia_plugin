@@ -69,9 +69,9 @@ claude --plugin-dir ./medical-content-team
 
 | Marketplace | 說明 | 安裝指令 |
 |---|---|---|
-| **Claude Official Plugins** | Anthropic 官方插件 | `/plugin marketplace add anthropics/claude-plugins-official` |
-| **Everything Claude Code** | 全方位開發技能套件（40+ skills） | `/plugin marketplace add affaan-m/everything-claude-code` |
-| **Jeffallan Claude Skills** | 社群貢獻技能集 | `/plugin marketplace add Jeffallan/claude-skills` |
+| [**Claude Official Plugins**](https://github.com/anthropics/claude-plugins-official) | Anthropic 官方插件 | `/plugin marketplace add anthropics/claude-plugins-official` |
+| [**Everything Claude Code**](https://github.com/affaan-m/everything-claude-code) | 全方位開發技能套件（40+ skills） | `/plugin marketplace add affaan-m/everything-claude-code` |
+| [**Jeffallan Claude Skills**](https://github.com/Jeffallan/claude-skills) | 社群貢獻技能集 | `/plugin marketplace add Jeffallan/claude-skills` |
 
 ## License
 
