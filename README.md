@@ -14,10 +14,6 @@ Claude Code 插件市集 — 專為台灣醫療診所、內容創作者和行銷
 
 國家衛生研究院 V4 版健康風險評估系統的完整實作參考。支援五大疾病風險計算：冠心病（CHD）、中風、高血壓、糖尿病、MACE。提供單機元件版與國健署 Web API 版兩種整合路線，包含風險公式係數查表、輸入驗證規則、跨語言回歸測試向量、API 適配器（FastAPI / Express / Spring / Go / Rust / .NET）腳手架產生、以及風險報告渲染功能。
 
-#### `nhs-pportal-screening` — Web 自動化整合 + 國健署預防保健篩檢
-
-通用的 Web 自動化整合設計模式，附帶國健署預防保健篩檢系統（pportal.hpa.gov.tw）作為完整參考實作。涵蓋 7 大設計原則：Session 管理、多視窗生命週期、DOM Polling、表單填入、XHR 攔截、登入偵測、錯誤恢復。適用於 Electron、Puppeteer、Playwright、Selenium 等所有瀏覽器自動化框架，包含成健、BC肝、大腸癌、口腔癌等篩檢查詢的具體實作範例。
-
 #### `vision-database` — 展望醫療系統 HIS 資料庫查詢
 
 展望診所 HIS 系統的完整資料庫知識庫。能根據需求定位正確的資料表、欄位與代碼，產出可執行的 SQLite / PostgreSQL 查詢語句。涵蓋病患主檔（CO01M）、處方記錄（CO02M/H/P）、檢驗數值（CO03L/M）、掛號、藥品庫存進銷存、預防保健、慢性病照護追蹤等模組，以及 VFP 報表系統語法參考。

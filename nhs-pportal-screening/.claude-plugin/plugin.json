@@ -1,9 +1,0 @@
-{
-  "name": "nhs-pportal-screening",
-  "description": "國健署預防保健篩檢資格查詢系統（pportal.hpa.gov.tw）的完整領域知識。包含登入流程、篩檢資格查詢、健保卡資料讀取等功能。",
-  "version": "1.0.0",
-  "author": {
-    "name": "leon"
-  },
-  "keywords": ["taiwan", "healthcare", "screening", "國健署", "篩檢"]
-}

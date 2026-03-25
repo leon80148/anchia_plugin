@@ -22,7 +22,7 @@ plugin-name/
     └── plugin.json           # 插件元資料（選填）
 ```
 
-適用：health-education-writer, nhs-pportal-screening, seo-geo-optimizer, vision-database
+適用：health-education-writer, seo-geo-optimizer, vision-database
 
 ### Flat 結構（系統整合類插件）
 
@@ -91,7 +91,7 @@ plugin-name/
 - **參考檔案**：每個檔案至少 50 行，禁止建立空的 stub 檔案
 - **檔案路徑**：SKILL.md 中引用的所有參考檔案路徑必須實際存在
 - **觸發詞**：description 欄位必須包含繁體中文觸發詞
-- **錯誤處理**：系統整合類插件（nhi-ic-card, nhri-risk-plugin, nhs-pportal-screening）必須包含錯誤處理/故障排除段落
+- **錯誤處理**：系統整合類插件（nhi-ic-card, nhri-risk-plugin）必須包含錯誤處理/故障排除段落
 
 ### 語言慣例
 
@@ -107,7 +107,6 @@ plugin-name/
 | medical-content-team | multi-agent | 內容 | 6 Agent 協作內容審查團隊 |
 | nhi-ic-card | flat | 醫療系統 | 健保IC卡讀卡整合 |
 | nhri-risk-plugin | flat | 醫療系統 | 國衛院健康風險評估 |
-| nhs-pportal-screening | nested | 醫療系統 | 國健署預防保健篩檢系統整合 |
 | vision-database | nested | 醫療系統 | 展望 HIS 資料庫查詢 |
 | seo-geo-optimizer | nested | 行銷 | SEO 與 GEO（生成式引擎最佳化）整合策略工具 |
 | continuous-learning | full-stack | 基礎設施 | Instinct-based 自動學習系統（hooks + observer） |
