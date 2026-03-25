@@ -65,6 +65,14 @@ claude --plugin-dir ./health-education-writer
 claude --plugin-dir ./medical-content-team
 ```
 
+## 推薦的其他 Plugin Marketplaces
+
+| Marketplace | 說明 | 安裝指令 |
+|---|---|---|
+| **Claude Official Plugins** | Anthropic 官方插件 | `/plugin marketplace add anthropics/claude-plugins-official` |
+| **Everything Claude Code** | 全方位開發技能套件（40+ skills） | `/plugin marketplace add affaan-m/everything-claude-code` |
+| **Jeffallan Claude Skills** | 社群貢獻技能集 | `/plugin marketplace add Jeffallan/claude-skills` |
+
 ## License
 
 MIT
