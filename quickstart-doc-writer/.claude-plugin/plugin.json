@@ -1,9 +1,0 @@
-{
-  "name": "quickstart-doc-writer",
-  "description": "產出 app、工具或機器的「快速上手說明文件」。輸出純 Markdown 格式，含圖片描述佔位符。",
-  "version": "1.0.0",
-  "author": {
-    "name": "leon"
-  },
-  "keywords": ["documentation", "quickstart", "guide", "tutorial", "說明文件"]
-}

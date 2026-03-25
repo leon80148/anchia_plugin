@@ -6,7 +6,6 @@ description: |
   可將 instincts 進化為 skills、commands 或 agents。
   觸發詞：自動學習、持續學習、instinct、學習機制、模式偵測、
   continuous learning、pattern detection、行為學習
-version: 2.0.0
 ---
 
 # Continuous Learning v2 — Instinct-Based 自動學習系統
@@ -228,6 +227,58 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instinct-cli.py" import "${CLAUDE_PLUGIN_
 - 長時間未觀察到模式
 - 出現矛盾證據
 
+## 好 Instinct vs 壞 Instinct（具體對比）
+
+### 好的 Instinct ✅
+
+```yaml
+id: use-group-concat-for-co02h
+trigger: "when querying CO02H SOAP notes"
+confidence: 0.8
+domain: "database-query"
+---
+# Always GROUP_CONCAT CO02H records by SATB
+
+## Action
+When querying CO02H, always use GROUP_CONCAT(STEXT, '' ORDER BY SATB)
+to merge segmented SOAP notes. Never return just SATB='1'.
+
+## Evidence
+- User corrected a query that only returned first segment (2025-01-15)
+- Same pattern observed in 3 subsequent database sessions
+- Confirmed in vision-database SKILL.md gotchas section
+```
+
+**為什麼好**：觸發條件具體（查 CO02H 時）、動作明確（用 GROUP_CONCAT）、有反例（不要只取 SATB='1'）、證據來自多次觀察。
+
+### 壞的 Instinct ❌
+
+```yaml
+id: write-better-code
+trigger: "when writing code"
+confidence: 0.6
+domain: "general"
+---
+# Write Better Code
+
+## Action
+Always write clean, maintainable code.
+
+## Evidence
+- General observation from multiple sessions
+```
+
+**為什麼壞**：觸發條件太泛（寫任何程式碼時）、動作是空話（「寫好的程式碼」誰不想？）、沒有具體的「做什麼」、證據模糊。
+
+### 判斷公式
+
+一個 instinct 值得保留，當且僅當：
+1. 你能想到**它不適用的具體情況**（有邊界 = 有意義）
+2. 另一個人看到它會知道**要改變什麼行為**（可執行）
+3. 它的觸發條件**不超過一句話**（太長 = 太複雜，應該拆成多個）
+
+---
+
 ## 為何用 Hooks 而非 Skills 觀察？
 
 v1 依賴 skills 來觀察。Skills 是機率性的 — 基於 Claude 的判斷約 50-80% 觸發。
@@ -270,6 +321,39 @@ rm ~/.claude/homunculus/disabled       # 重新啟用
 1. 確認累積足夠觀察（10+）
 2. 執行 `/instinct-status` 檢查現有 instincts
 3. 手動執行 observer 分析
+
+## 邊界與失敗模式
+
+**學習系統本身的限制，誠實面對：**
+
+| 情況 | 為什麼失敗 | 怎麼辨認 |
+|------|-----------|---------|
+| 觀察數量不足（< 10 條） | Observer 沒有足夠的模式樣本，instinct 品質低 | 生成的 instinct 過於籠統或不準確 |
+| 使用者的行為本身不一致 | 學習到的是矛盾的模式 | 兩個 instinct 互相衝突 |
+| 信心度過高但實際上不可靠 | 觀察量少但重複多，系統誤以為是強模式 | 驗證一個高信心 instinct 實際上不適用 |
+| Hooks 沒有觸發 | settings.json 設定錯誤，或 disabled 檔案存在 | observations.jsonl 沒有新內容 |
+| 觀察到的是異常工作流，而不是一般模式 | 某次特殊任務產生了錯誤的 instinct | Instinct 只在很特定的情況下適用 |
+
+**這個系統不能替代的事：**
+- 明確的使用者指令（CLAUDE.md 中的規則比 instinct 優先）
+- 對話記憶（instincts 是模式，不是特定對話的記憶）
+- 你主動思考什麼值得學習（系統觀察，但你來裁決）
+
+## 成功的樣子
+
+**一個有效的 instinct 長這樣：**
+
+1. **觸發條件明確**：「當我在做 X 的時候」而不是「大多數時候」
+2. **動作具體**：「用 Y 而不是 Z」而不是「要做得更好」
+3. **有反例**：知道什麼情況下這個 instinct 不適用
+4. **信心度和實際使用次數相符**：如果你只看過一次，信心度不應超過 0.4
+
+**系統健康指標：**
+- 每週至少有 5 條新觀察
+- Instincts 目錄有實際在成長
+- 執行 `/instinct-status` 時，至少有一條 instinct 信心度 ≥ 0.7
+
+---
 
 ## 相關連結
 

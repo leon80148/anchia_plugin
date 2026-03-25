@@ -2,14 +2,19 @@
 name: vision-database
 description: |
   展望醫療系統 HIS 資料庫查詢技能。根據需求定位正確的資料表、欄位與代碼，
-  產出可執行的 SQLite 或 PostgreSQL 查詢語句。
+  產出可執行的 SQLite 或 PostgreSQL 查詢語句。同時涵蓋 VFP 報表系統語法。
 
   觸發詞：展望資料庫、vision_clinic.db、展望HIS、診所資料庫查詢、
-  DBF檔案、CO01M、CO02M、CO02H、CO03L、CO18H、VISHFAM、
+  DBF檔案、CO01M、CO02M、CO02H、CO02P、CO03L、CO03M、
+  CO05B、CO05O、CO07A、CO09D、CO09S、CO10A、CO10H、CO10P、
+  CO11A、CO11H、CO14M、CO18H、CO18HD2、VISHFAM、
   病患查詢、處方記錄、SOAP病歷、檢驗數值、掛號記錄、藥品庫存、
   預防保健查詢、糖尿病照護追蹤、CKD追蹤、家醫計畫、
-  庫存月報、存貨月報、進銷存、月結檔、CO10P、CO02P、CO14M、
-  庫存異動、期初存量、期末結存、庫位管理、WHI庫存系統
+  庫存月報、存貨月報、進銷存、月結檔、
+  庫存異動、期初存量、期末結存、庫位管理、WHI庫存系統、
+  醫師主檔、人員查詢、進貨單頭、庫存調整、健檢明細、
+  報表系統、報表模組、VFP報表、F_GTFM、INT報表、PRG程式、
+  存貨報表、耗用統計、盤點報表、安全存量
 ---
 
 # Skill: 展望醫療系統資料庫
@@ -22,11 +27,15 @@ description: |
 
 - 使用者提到**展望資料庫**、**vision_clinic.db**、**HIS 系統**、**診所資料**
 - 需要查詢**病患**、**處方**、**檢驗**、**掛號**、**庫存**相關醫療資料
-- 使用者提到 **DBF 檔案**或相關資料表名稱（CO01M, CO02M, CO02F, CO02H, CO02P, CO03L, CO03M, CO05B, CO05O, CO09D, CO09S, CO10A, CO10P, CO14M, CO18H, VISHFAM, CO9Dxxxx）
+- 使用者提到 **DBF 檔案**或相關資料表名稱（CO01M, CO02M, CO02F, CO02H, CO02P, CO03L, CO03M, CO05B, CO05O, CO07A, CO09D, CO09S, CO10A, CO10H, CO10P, CO11A, CO11H, CO14M, CO18H, CO18HD2, VISHFAM, CO9Dxxxx）
 - 使用者詢問**藥品庫存**、**進銷存**、**存貨月報**、**庫存月報**、**庫位管理**
 - 使用者詢問**預防保健**、**疾病管理**（糖尿病照護、CKD 等）
 - 使用者提到**病歷號** (KCSTMR)、**ICD 診斷碼**、**檢驗項目代碼** (HITEM)
 - 使用者詢問**病歷紀錄**、**SOAP Notes**、**醫師記錄**、**看診紀錄內容**
+- 使用者詢問**醫師主檔**、**人員資料** (CO07A)
+- 使用者詢問**健檢明細**、**檢查細項數值** (CO18HD2)
+- 使用者詢問**進貨單頭** (CO10H)、**庫存調整** (CO11A/CO11H)
+- 使用者詢問**報表系統**、**VFP 報表**、**INT/PRG 報表程式**、**F_GTFM 框架**
 
 ## 使用說明
 
@@ -76,9 +85,10 @@ sqlite3 "<專案中 vision_clinic.db 的路徑>" "SELECT ..."
 |-----------|---------|----------|------|
 | 就診歷史（含診斷） | **CO03L** | `KCSTMR`, `DATE`, `TIME`, `LABNO`(ICD主診斷), `LABDT`(診斷中文), `LTIME`(完診時間) | `LTIME='000000'` 表示未完診 |
 | 掛號記錄（完整） | **CO05O** | `KCSTMR`, `TBKDT`, `TSTS`(狀態), `TNAME`, `TARTIME`(看診順序) | 含費用欄位 |
-| 預約記錄 | **CO05B** | `KCSTMR`, `TBKDATE`, `TBKTIME`, `TSTS` | CO05O 的子集 |
+| 預約記錄 | **CO05B** | `KCSTMR`, `TBKDT`(日期), `TID`(醫師), `TSTS`(狀態), `TARTIME`(順序), `LM`(午別) | `TBKDATE`/`TBKTIME` 已棄用；狀態碼與 CO05O **不同** |
 | 今日門診狀態 | **CO05O** | `TBKDT`=今日 + `TSTS IN ('0','1')` | 候診中=0, 看診中=1, 完診=F |
 | 看診費用與診斷碼 | **CO03M** | `KCSTMR`, `IDATE`, `LABNO`(主ICD), `LACD01`~`LACD05`(次ICD), `TOT`(總額), `A98`(部分負擔) | |
+| 醫師/人員資料 | **CO07A** | `NO`(人員碼), `NAME`(姓名), `ICD9NO` | `NO` 對應 CO03L.LPID |
 
 ### 處方與用藥
 
@@ -96,6 +106,8 @@ sqlite3 "<專案中 vision_clinic.db 的路徑>" "SELECT ..."
 | 生理量測（血壓等） | **CO18H** | 同上，`HITEM` 無 `Z0S` 前綴 | BP 格式為 `收縮壓/舒張壓` |
 | 某項檢驗的趨勢 | **CO18H** | `WHERE KCSTMR=? AND HITEM=? ORDER BY HDATE DESC` | |
 | 最近一次各項結果 | **CO18H** | 需子查詢取每個 HITEM 的 MAX(HDATE) | 見查詢範例 |
+| 健檢細項數值（含單位/參考值） | **CO18HD2** | `CNORNO`(病歷號), `D2DATE`, `KDRUG`(項目碼), `D2NM`(項目名), `D2VL`(數值), `D2UN`(單位), `D2RF`(參考值) | 透過 `CO18H.CNORNO = CO18HD2.CNORNO` 關聯 |
+| 健檢報告文字（Memo） | **CO18HD2** | `D2TX`, `D2T0`~`D2T2`, `D2RM`(備註), `D213` | Memo 欄位可存長文字 |
 
 ### 病歷紀錄（SOAP Notes）
 
@@ -126,6 +138,9 @@ sqlite3 "<專案中 vision_clinic.db 的路徑>" "SELECT ..."
 | 異動類型定義 | **CO10P** | `PTYP1`(代碼), `PTITL`(名稱), `PQTY`(+/-方向) | 僅 3 筆記錄 |
 | 庫位 / 廠商資訊 | **CO14M** | `MTYPE`+`MNO`(複合鍵), `MNAME` | MTYPE: 1=主要, 3=倉庫 |
 | 藥局調劑交易明細 | **CO02P** | `PDATE`, `KDRUG`, `PTQTY`(含正負號) | 不同於 CO02M 處方記錄 |
+| 進貨單頭（訂單層級） | **CO10H** | `KDONO`(單號), `ADATE`(日期), `MNO`(供應商), `MTOTAL`(總額), `DRUGLIC`(藥商執照) | 與 CO10A 以 `KDONO` 關聯 |
+| 庫存調整明細 | **CO11A** | `ASMNM`(調整單號), `KDRUG`, `ADTYP`(調整類型), `PTQTY`(實際數量), `PDAY` | 與 CO11H 以 `ASMNM` 關聯 |
+| 庫存調整單頭 | **CO11H** | `ASMNM`(調整單號), `HTP`(調整類型旗標), `AACD1`~`AACD6` | 盤點/調整/報廢的單頭資訊 |
 
 ### 預防保健與疾病管理
 
@@ -138,6 +153,16 @@ sqlite3 "<專案中 vision_clinic.db 的路徑>" "SELECT ..."
 | CKD 照護追蹤 | **CO02M** | `DNO IN ('P4301C','P4302C')` | |
 | 代謝症候群追蹤 | **CO02M** | `DNO IN ('P7501C','P7502C','P7503C')` | |
 | 家醫計畫成員 | **VISHFAM** | `CASE_TYPE`(A=健保收案, B=一般), 健康風險: `HBP`(高血壓), `ASCVD` 等 | |
+
+### 報表系統（VFP INT/PRG）
+
+| 我需要... | 參考資源 | 關鍵知識 | 備註 |
+|-----------|---------|----------|------|
+| 了解報表框架與執行流程 | `references/report-system.md` | F_GTFM 語法、F_GETVAR/F_OPT 函式 | 所有 .INT 報表共用此框架 |
+| 查找特定報表模組 | `references/report-system.md` | VST/VISI/WHR 系列、SCX 表單 | 14 大類 50+ 模組 |
+| 撰寫 VFP SQL 查詢 | `references/report-system.md` | 日期範圍、JOIN、聚合、CURSOR | 含 ZZZZZZ 哨兵值、$ 運算子 |
+| 使用 VFP 內建函式 | `references/report-system.md` | ALLTRIM, STRZERO, LEFTX, IIF, NVL | LEFTX 處理中文安全截斷 |
+| 理解報表的條件輸入介面 | `references/report-system.md` | F_GTFM 格式字串、TXBCLM0 COM | 日期選擇器、選項框 |
 
 ---
 
@@ -235,6 +260,50 @@ sqlite3 "<專案中 vision_clinic.db 的路徑>" "SELECT ..."
 | TARTIME | 看診順序號 | `00015` |
 | TNAME | 姓名 | |
 
+### CO05B - 預約掛號（複合鍵: KCSTMR+TBKDT+TID+TARTIME）
+
+| 欄位 | 說明 | 範例 |
+|------|------|------|
+| KCSTMR | 病歷號 (7位左補零) | `0002368` |
+| TBKDT | **預約日期**（民國年 YYYMMDD） | `1150408` |
+| ~~TBKDATE~~ | ~~預約日期（舊欄位）~~ | **已棄用，值為空字串，勿使用** |
+| ~~TBKTIME~~ | ~~預約時段（舊欄位）~~ | **已棄用，值為空字串，勿使用** |
+| TID | 醫師代碼 | `2` |
+| TIDS | 時段代碼 | `01` |
+| TSTS | **預約狀態**（見下方狀態碼） | `S` |
+| TARTIME | **報到序號/看診順序** | `0005` |
+| TNOTE | 預約備註 | `檢`=檢查, `複`=複診 |
+| LM | 午別 (A=上午, B=下午, C=晚上) | `A` |
+| BNAME | 病患姓名（預約時帶入） | `曾欣儀` |
+| TDUTY | 診間/值班資訊 | `B201林` (診間代碼+醫師姓) |
+| TIDSRM | 診間代碼 | `2` |
+
+**CO05B.TSTS 狀態碼**（⚠ 與 CO05O.TSTS 為不同編碼系統）：
+
+| 狀態碼 | 說明 | 分類 |
+|--------|------|------|
+| `""` / `0` / `1` | 空值/待確認/已確認 | 有效 |
+| `S` | 已排約 (Scheduled) | 有效 |
+| `U` | 已報到 (Checked-in) | 有效 |
+| `E` | 看診中 (In progress) | 有效 |
+| `F` | 已完診 (Finished) | 有效 |
+| `C` | 已取消 | 取消 |
+| `X` | 已刪除 | 取消 |
+| `D` | 已作廢 | 取消 |
+| `H` | 電話取消 | 取消 |
+
+> 篩選有效預約：`WHERE TSTS NOT IN ('C','X','D','H')`。排名排序用 `ORDER BY TARTIME ASC`。
+
+### CO07A - 醫師/人員主檔（主鍵: NO，14,119 筆）
+
+| 欄位 | 說明 | 範例 |
+|------|------|------|
+| NO | 人員代碼（對應 CO03L.LPID） | `2` |
+| NAME | 姓名 (80 字元) | `林醫師` |
+| ICD9NO | 醫事人員代碼 | |
+
+> 完整 21 欄位詳見 `references/schema-verified.md`
+
 ### CO18H - 檢驗報告與生理量測（複合鍵: KCSTMR+HDATE+HITEM）
 
 | 欄位 | 說明 | 範例 |
@@ -245,6 +314,25 @@ sqlite3 "<專案中 vision_clinic.db 的路徑>" "SELECT ..."
 | HDSCP | 項目說明 | `HbA1C,醣化血色素` |
 | HVAL | 數值（文字型態） | `6.5` |
 | HRESULT | 結果判定 | `偏高` |
+
+### CO18HD2 - 健檢/病歷明細（複合鍵: CNORNO+HITEM+D2SS，162,045 筆）
+
+| 欄位 | 說明 | 範例 |
+|------|------|------|
+| KCSTMR | 病歷號 | `0000024` |
+| CNORNO | 病歷號碼（FK → CO18H.CNORNO） | |
+| D2DATE / D2TIME | 檢查日期/時間 | `1141127` |
+| KDRUG | 項目代碼（FK → CO09D.KDRUG） | |
+| D2NM | 項目名稱 (100 字元) | `HbA1C,醣化血色素` |
+| D2VL | 數值結果 (200 字元，文字型態) | `6.5` |
+| D2UN | 單位 | `%` |
+| D2RF | 參考值範圍 | `4.0-6.0` |
+| D2SS | 序號 | |
+| D2TX, D2T0~D2T2 | Memo 文字欄位（可存長文字） | |
+| D2RM | 備註 | |
+| D213 | 擴充 Memo 欄位 | |
+
+> CO18HD2 vs CO18H：CO18H 存放單一數值結果 (HVAL)，CO18HD2 存放結構化的檢查明細（含單位、參考值、Memo 文字）。兩者透過 `CNORNO` 關聯。
 
 ### CO09D - 藥品主檔（主鍵: KDRUG，共 102 欄位）
 
@@ -299,6 +387,41 @@ sqlite3 "<專案中 vision_clinic.db 的路徑>" "SELECT ..."
 | AREMARK | 備註（進貨時為有效期限，西元 YYYYMMDD） |
 | AITEM | 項次 |
 | AUM | 單位 |
+
+### CO10H - 進貨單頭檔（主鍵: KDONO，0 筆）
+
+| 欄位 | 說明 |
+|------|------|
+| KDONO | **單據號碼**（對應 CO10A.KDONO） |
+| ADATE | 進貨日期（YYYMMDD） |
+| MNO | 供應商代碼（FK → CO14M） |
+| MTOTAL | 訂單總額 |
+| DRUGLIC | 藥商執照號碼 |
+
+> 記錄數為 0（目前無進貨單頭資料），完整 22 欄位詳見 `references/schema-verified.md`
+
+### CO11A - 庫存調整明細（複合鍵: ASMNM+KDRUG，620 筆）
+
+| 欄位 | 說明 |
+|------|------|
+| ASMNM | **調整單號**（FK → CO11H.ASMNM） |
+| KDRUG | 藥品代碼（FK → CO09D） |
+| ADTYP | 調整類型 |
+| PQTY / PTQTY | 預計數量 / 實際數量 |
+| PDAY | 天數 |
+
+> 完整 23 欄位詳見 `references/schema-verified.md`
+
+### CO11H - 庫存調整單頭（主鍵: ASMNM，75 筆）
+
+| 欄位 | 說明 |
+|------|------|
+| ASMNM | **調整單號** |
+| HTP | 調整類型旗標 |
+| AACD1~AACD6 | 分類代碼欄位 |
+| AICD / AITM | 對應 ICD/項目 |
+
+> 完整 23 欄位詳見 `references/schema-verified.md`
 
 ### CO10P - 異動類型定義檔（主鍵: PTYP1，僅 3 筆）
 
@@ -368,7 +491,8 @@ CO01M (病患主檔, 主鍵: KCSTMR)
 CO02H ←→ CO02M   以 (KCSTMR + SDATE/IDATE + STIME/ITIME) 關聯病歷與處方
 CO02M ←→ CO02F   以 (KCSTMR + IDATE/FDATE + ITIME/FTIME) 關聯處方與檢查報告
 CO03L ←→ CO03M   以 (KCSTMR + DATE + TIME) 關聯就診與費用
-CO05O ⊃ CO05B    CO05O 為完整掛號，CO05B 為預約子集
+CO05B ──→ CO01M   以 KCSTMR 關聯病患主檔
+CO05O ⊃ CO05B    CO05B 為預約掛號，CO05O 為門診掛號（⚠ TSTS 編碼不同）
 
 CO02M.DNO ──→ CO09D.KDRUG 或 CO09D.DNO (處方→藥品)
 CO09D.KDRUG ←── CO09S.KDRUG (庫存餘額)
@@ -376,6 +500,12 @@ CO09D.KDRUG ←── CO10A.KDRUG (庫存異動)
 CO09D.KDRUG ←── CO02P.KDRUG (藥局調劑)
 CO10A.ATYPE ──→ CO10P.PTYP1 (異動類型定義)
 CO10A.MTYPE+MNO ──→ CO14M.MTYPE+MNO (庫位/廠商)
+CO10A.KDONO ──→ CO10H.KDONO (進貨單頭)
+CO11A.ASMNM ──→ CO11H.ASMNM (調整單頭)
+CO11A.KDRUG ──→ CO09D.KDRUG (調整藥品)
+CO18H.CNORNO ──→ CO18HD2.CNORNO (健檢明細)
+CO18HD2.KDRUG ──→ CO09D.KDRUG (檢查項目對應藥品主檔)
+CO03L.LPID ──→ CO07A.NO (就診醫師/人員)
 CO9Dxxxx ←── CO09D.KDRUG (月結成本檔，需先結算)
 ```
 
@@ -545,6 +675,7 @@ SELECT LPAD((EXTRACT(YEAR FROM CURRENT_DATE - INTERVAL '3 months') - 1911)::TEXT
 | 性別 | CO01M.MSEX | 1=男, 2=女 |
 | 身分別 | CO03L.LPID / CO05O.LM / CO02H.SLM | A=健保, 9=其他, 1=重大傷病, 3=福保, 4=榮民, 空=自費 |
 | 看診狀態 | CO05O.TSTS | 0=候診, 1=看診中, E=預約, F=完診, H=取消 |
+| **預約狀態** | CO05B.TSTS | S=已排約, U=已報到, E=看診中, F=完診, 0=待確認, 1=已確認, C/X/D/H=取消（⚠ 與 CO05O 不同編碼） |
 | 藥品類別 | CO09D.DTYPE | 2=內服, 3=外用, 4=注射, 12=材料（用 `VAL(DTYPE)` 比較） |
 | 庫存異動 | CO09S.DIO / CO10P.PTYP1 | B=期初, 2/I=進貨, 5/O=出貨, 3=客退, 4=退廠, 6=撥入, 7=撥出, 8=調整, @=作廢 |
 | 庫位 | CO09S.DLCT / CO14M.MTYPE | DLCT: O=本庫, D=其他；MTYPE: 1=主要, 3=倉庫 |
@@ -614,6 +745,15 @@ WHERE DQTY2 <= DORDPOINT ORDER BY (DQTY2 / NULLIF(DORDPOINT, 0)) ASC;
 12. **CO9Dxxxx 需先結算** — 存貨月報表讀取月結檔 `CO9Dxxxx.DBF`，必須先執行成本結算作業才存在
 13. **CO09S.DLCT 庫位** — 查庫存必須指定 `DLCT='O'`（本庫），空白也視為本庫
 14. **DTYPE 數值比較** — 系統用 `VAL(DTYPE)` 轉數值，不是字串比較（`'2'` 不是 `'02'`）
+15. **CO05B.TBKDATE/TBKTIME 已棄用** — 這兩個舊欄位在目前資料庫中值皆為空字串，預約日期必須用 `TBKDT`
+16. **CO05B.TSTS ≠ CO05O.TSTS** — 兩張表的狀態碼是不同的編碼系統。篩選有效預約用 `CO05B.TSTS NOT IN ('C','X','D','H')`，不要套用 CO05O 的狀態碼邏輯
+17. **CO05B 病患姓名優先順序** — `CO05O.TNAME` > `CO05B.BNAME` > `CO01M.MNAME`，取姓名時用 COALESCE 依序嘗試
+18. **CO18HD2.D2VL 是 200 字元文字欄位** — 比 CO18H.HVAL (80 字元) 更長，同樣需要 CAST 才能做數值比較
+19. **CO18HD2 vs CO18H 選擇** — CO18H 適合快速查單一數值結果 (HVAL)；CO18HD2 提供結構化明細（含單位 D2UN、參考值 D2RF、Memo 文字），但需透過 CNORNO 關聯
+20. **CO03L 內嵌檢驗欄位** — CO03L 有 A0~A21 等直接儲存檢驗結果的欄位（92 欄位），但主要檢驗數值查詢仍建議走 CO18H/CO18HD2
+21. **CO07A.NO 對應 CO03L.LPID** — 查詢醫師姓名時用 `CO07A.NO = CO03L.LPID` 關聯，不是 KCSTMR
+22. **VFP 報表日期+時間查詢** — 報表框架使用 `DATE + TIME >= F_IBEG` 而非分開比較；時間上界加 `"ZZZZZZ"` 哨兵值代表 23:59:59
+23. **LEFTX vs LEFT** — VFP 中 `LEFT()` 可能在中文字元（Big5 雙位元組）中間截斷，應使用 `LEFTX()` 安全截斷
 
 ---
 
@@ -753,6 +893,12 @@ ORDER BY a.AREMARK ASC;
 | 預防保健追蹤 | VISHFAM → CO01M(MPERSONID=PAT_PID) → CO03L(LISRS) |
 | 病歷查詢分析 | CO02H(SOAP, 需合併SATB) + CO02M+CO09D(處方) |
 | 門診即時看板 | CO05O(TBKDT=今日) + CO01M + CO03L |
+| 預約掛號管理 | CO05B(TBKDT=日期, TSTS排除C/X/D/H) + CO01M(姓名) |
+| 健檢結構化明細 | CO18HD2(含單位/參考值/Memo) ←CNORNO→ CO18H ←KCSTMR→ CO01M |
+| 醫師/人員查詢 | CO07A(NO) ←LPID→ CO03L(就診記錄) |
+| 進貨單管理 | CO10H(單頭) ←KDONO→ CO10A(明細) ←KDRUG→ CO09D |
+| 庫存調整管理 | CO11H(單頭) ←ASMNM→ CO11A(明細) ←KDRUG→ CO09D |
+| VFP 報表開發/分析 | `references/report-system.md`（F_GTFM 框架 + 模組目錄 + SQL 模式） |
 
 ## 成功的樣子
 
@@ -775,3 +921,5 @@ ORDER BY a.AREMARK ASC;
 | `references/full-text-search.md` | SOAP Notes 全文搜尋（SQLite FTS5 / PostgreSQL tsvector） |
 | `references/inventory-system.md` | 庫存系統完整參考（計算邏輯、系統參數、報表程式、進階查詢） |
 | `references/advanced-topics.md` | 資料匿名化指南、VISHFAM 系統 Schema 說明 |
+| `references/schema-verified.md` | **14 張表完整欄位定義**（三輪驗證版，含型態、長度、記錄數、ER 圖） |
+| `references/report-system.md` | **VFP 報表系統**（F_GTFM 框架、50+ 模組目錄、SQL 模式、函式速查） |

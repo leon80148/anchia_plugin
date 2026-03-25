@@ -143,3 +143,95 @@ Maintain consistent directory structure within each plugin type:
 - Project has 3 structure types (nested, flat, multi-agent)
 - Each must be internally consistent for predictable behavior
 - Mixing structures within a type causes confusion
+
+---
+id: reference-substantive-content
+trigger: "expanding or creating reference files"
+confidence: 0.9
+domain: quality
+source: session_observation
+evidence: "Round 7: 12 nhri-risk-plugin reference files were 15-39 lines with skeleton content"
+---
+
+# Reference Substantive Content
+
+## Action
+When expanding a reference file to meet the 50-line minimum, add content that
+a real user would actually look up: code examples, decision tables, edge cases,
+troubleshooting tables. Never pad with filler text or redundant explanations.
+
+## Evidence
+- Round 7: Found 12 reference files in nhri-risk-plugin at 15-39 lines
+- All were expanded with substantive content (code skeletons, validation examples,
+  CI templates, clinical communication templates)
+- The content type should match what users query that reference for
+
+---
+id: cross-plugin-references
+trigger: "completing a plugin that works in a workflow with other plugins"
+confidence: 0.8
+domain: ecosystem
+source: session_observation
+evidence: "Round 8: Added cross-references between nhi-ic-card, nhs-pportal-screening, vision-database, nhri-risk-plugin"
+---
+
+# Cross-Plugin References
+
+## Action
+When a plugin naturally chains with other plugins in a workflow, add a
+"相關插件" section at the end of SKILL.md listing the workflow steps
+and which plugin handles each step.
+
+## Evidence
+- Clinical workflow: nhi-ic-card → nhs-pportal-screening → vision-database → nhri-risk-plugin
+- Content workflow: health-education-writer → medical-content-team
+- Users don't discover these connections on their own
+
+---
+id: failure-diagnosis-over-happy-path
+trigger: "adding practical examples to a skill"
+confidence: 0.85
+domain: quality
+source: session_observation
+evidence: "Round 7-8: Training failure diagnosis and discussion stall recovery had highest practical value"
+---
+
+# Failure Diagnosis Over Happy Path
+
+## Action
+When adding examples to a skill, prioritize failure diagnosis content
+(what goes wrong, how to recognize it, how to fix it) over happy-path
+walkthroughs. Users rarely need help with the happy path.
+
+## Evidence
+- LoRA training failure diagnosis (4 symptom categories) was the most
+  impactful addition to lora-training-prompts
+- Discussion stall recovery protocol was the most impactful addition
+  to medical-content-team
+- Happy-path examples are necessary but failure diagnosis is what
+  separates a good skill from a great one
+
+---
+id: cross-reference-verification
+trigger: "same concept described in SKILL.md and reference files"
+confidence: 0.95
+domain: quality
+source: session_observation
+evidence: "Round 9: Found critical field name mismatches (tc vs chol, hdl vs hdlc) and wrong JOIN columns between SKILL.md and reference files"
+---
+
+# Cross-Reference Verification
+
+## Action
+When the same data (field names, thresholds, code examples, eligibility rules)
+appears in both SKILL.md and reference files, verify they are identical.
+Add a "canonical source" note pointing to the single authoritative file.
+
+## Evidence
+- nhri-risk-plugin: SKILL.md used tc/hdl/ldl/fpg but endpoint-contract.md
+  used chol/hdlc/ldlc/glu — code examples would fail at runtime
+- vision-database: cross-table join documented as DATE/TIME but actual
+  columns are IDATE/ITIME and FDATE/FTIME
+- nhi-ic-card: SamId mock was 16 chars but spec says 12
+- Fixing these 14 lines of bugs was more impactful than 1000+ lines of
+  new content added in previous rounds

@@ -1,9 +1,0 @@
-{
-  "name": "lora-training-prompts",
-  "description": "生成一致性 AI 圖像提示詞用於 LoRA 訓練資料集。支援角色一致性、多姿態、多角度、多表情的訓練提示詞生成。",
-  "version": "1.0.0",
-  "author": {
-    "name": "leon"
-  },
-  "keywords": ["lora", "ai-image", "training", "prompt", "stable-diffusion"]
-}

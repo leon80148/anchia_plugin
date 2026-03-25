@@ -1,25 +1,65 @@
 # Interpretation Rules
 
-## Status
-- `status == 1`: invalid input or failed evaluation.
-- `status == 0`: valid result.
+NHRI V4 風險評估結果的判讀規則與臨床對應建議。
+
+## Status 欄位
+
+| status | 意義 | 後續動作 |
+|--------|------|---------|
+| `0` | 評估成功，結果有效 | 讀取 risk、band 等欄位 |
+| `1` | 輸入不足或驗證失敗 | 檢查缺少的必填欄位，不要使用 risk 值 |
+
+**重要**：`status: 1` 時，risk/populationAvg/multipleDiff 的值無意義，不可呈現給使用者。
 
 ## Risk Band Mapping
 
-### CHD / Stroke / Diabetes / MACE
-- `risk >= 20`: `high`
-- `10 <= risk < 20`: `elevated`
-- `risk < 10`: `lower`
+### CHD / Stroke / Diabetes / MACE（以絕對風險值判定）
 
-### Hypertension
-- `multipleDiff > 1.25`: `high`
-- `0.75 <= multipleDiff <= 1.25`: `elevated`
-- `multipleDiff < 0.75`: `lower`
+| risk 值 | riskType | band | 臨床意義 |
+|---------|----------|------|---------|
+| >= 20% | 2 | `high` | 10 年內發生該事件的機率高 |
+| 10-19.99% | 1 | `elevated` | 中等風險，需關注 |
+| < 10% | 0 | `lower` | 相對低風險 |
 
-## Narrative Guidance
-- `high`: advise clinician review and short-interval follow-up.
-- `elevated`: advise targeted lifestyle/biomarker management and routine follow-up.
-- `lower`: advise ongoing monitoring and preventive care continuity.
+### Hypertension（以相對倍率判定）
+
+高血壓使用 `multipleDiff`（個人風險 / 同年齡族群平均風險）而非絕對值：
+
+| multipleDiff | riskType | band | 臨床意義 |
+|-------------|----------|------|---------|
+| > 1.25 | 2 | `high` | 風險顯著高於同齡族群 |
+| 0.75 - 1.25 | 1 | `elevated` | 風險與同齡族群相當 |
+| < 0.75 | 0 | `lower` | 風險低於同齡族群 |
+
+### 為什麼高血壓不同？
+
+高血壓的 10 年絕對風險在年長族群中普遍很高（60 歲以上常 > 50%），用絕對值分類幾乎所有人都是 high。因此改用「與同齡族群的比較」來識別真正需要關注的個案。
+
+## 臨床建議對照
+
+| Band | 建議方向 | 回診間隔建議 |
+|------|---------|-------------|
+| `high` | 轉介醫師評估、啟動積極介入計畫 | 1-3 個月 |
+| `elevated` | 針對性生活型態調整、追蹤特定指標 | 3-6 個月 |
+| `lower` | 維持健康行為、例行健檢 | 6-12 個月 |
+
+### 對應的患者溝通範本
+
+**high**：「您的 {model} 風險評估結果偏高。建議近期回診與醫師討論，制定個人化的健康管理計畫。」
+
+**elevated**：「您的 {model} 風險評估結果在中等範圍。建議注意 {相關生活型態因子}，並在 {回診間隔} 後追蹤。」
+
+**lower**：「您的 {model} 風險評估結果在正常範圍。建議維持目前的健康習慣，定期健檢追蹤。」
+
+## Population Average 的使用
+
+- `populationAvg` 只在 age 35-70 之間有值（非零）。
+- 超出此範圍時 `populationAvg = 0`，`multipleDiff = 0`。
+- 報告中遇到 `populationAvg = 0` 時，不要顯示「與族群平均比較」的欄位。
 
 ## Output Consistency
-Use the same terminology in all render targets (`high`, `elevated`, `lower`).
+
+所有輸出管道（JSON、Markdown 報告、HTML 圖表）必須使用統一術語：
+- Band 名稱：`high`、`elevated`、`lower`（英文小寫）
+- 中文對照：高風險、中等風險、低風險
+- 顏色對照：紅色（#E53E3E）、黃色（#D69E2E）、綠色（#38A169）

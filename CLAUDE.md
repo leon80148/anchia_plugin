@@ -22,7 +22,7 @@ plugin-name/
     └── plugin.json           # 插件元資料（選填）
 ```
 
-適用：health-education-writer, lora-training-prompts, nhs-pportal-screening, quickstart-doc-writer, viral-app-builder, vision-database
+適用：health-education-writer, nhs-pportal-screening, seo-geo-optimizer, vision-database
 
 ### Flat 結構（系統整合類插件）
 
@@ -104,13 +104,10 @@ plugin-name/
 | 插件 | 結構 | 領域 | 說明 |
 |------|------|------|------|
 | health-education-writer | nested | 內容 | 多領域教育科普文章生成器 |
-| lora-training-prompts | nested | AI/ML | LoRA 訓練素材與提示詞生成器 |
 | medical-content-team | multi-agent | 內容 | 6 Agent 協作內容審查團隊 |
 | nhi-ic-card | flat | 醫療系統 | 健保IC卡讀卡整合 |
 | nhri-risk-plugin | flat | 醫療系統 | 國衛院健康風險評估 |
 | nhs-pportal-screening | nested | 醫療系統 | 國健署預防保健篩檢系統整合 |
-| quickstart-doc-writer | nested | 文件 | 多類型技術文件產生器 |
-| viral-app-builder | nested | 開發 | 爆款 App 全生命週期開發助手 |
 | vision-database | nested | 醫療系統 | 展望 HIS 資料庫查詢 |
 | seo-geo-optimizer | nested | 行銷 | SEO 與 GEO（生成式引擎最佳化）整合策略工具 |
 | continuous-learning | full-stack | 基礎設施 | Instinct-based 自動學習系統（hooks + observer） |

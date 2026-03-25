@@ -1,9 +1,9 @@
 {
   "name": "nhri-risk-plugin",
-  "description": "國衛院 NHRI V4 健康風險評估系統。涵蓋 CHD、中風、高血壓、糖尿病、MACE 五大疾病風險模型的公式規格、輸入驗證、風險計算、迴歸測試、API 適配器產生、報告渲染等完整工作流。",
-  "version": "1.0.0",
+  "description": "國衛院 NHRI V4 健康風險評估系統。支援單機元件版與國健署 Web API 版。涵蓋 CHD、中風、高血壓、糖尿病、MACE 五大疾病風險模型的公式規格、輸入驗證、風險計算、迴歸測試、API 適配器產生、報告渲染，以及國健署遠端 API 串接指南。",
+  "version": "1.1.0",
   "author": {
     "name": "leon"
   },
-  "keywords": ["nhri", "risk", "health", "chd", "stroke", "diabetes", "hypertension", "mace", "醫療", "風險評估"]
+  "keywords": ["nhri", "risk", "health", "chd", "stroke", "diabetes", "hypertension", "mace", "醫療", "風險評估", "國健署API", "cdrc", "Web API"]
 }

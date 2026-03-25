@@ -1,9 +1,0 @@
-{
-  "name": "viral-app-builder",
-  "description": "跨平台爆款 App 全生命週期開發助手。涵蓋創意發想、市場驗證、MVP 規劃、UI/UX 設計、程式開發、測試迭代、成長黑客策略、營利模式到規模化擴展。",
-  "version": "1.0.0",
-  "author": {
-    "name": "leon"
-  },
-  "keywords": ["app", "startup", "mvp", "growth-hacking", "monetization"]
-}

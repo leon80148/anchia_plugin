@@ -1,7 +1,16 @@
 ---
 name: nhs-pportal-screening
-description: "Web 自動化整合與外部系統嵌入的通用設計原則和實作模式，附帶國健署預防保健篩檢系統（pportal.hpa.gov.tw）作為完整參考實作。涵蓋 Session 管理、多視窗生命週期、DOM Polling、表單填入、XHR 攔截、登入偵測等 7 大通用原則，適用於 Electron、Puppeteer、Playwright、Selenium 等所有瀏覽器自動化框架。"
-argument-hint: "[query-context]"
+description: |
+  Web 自動化整合與外部系統嵌入的通用設計原則和實作模式，附帶國健署預防保健篩檢系統
+  （pportal.hpa.gov.tw）作為完整參考實作。涵蓋 Session 管理、多視窗生命週期、
+  DOM Polling、表單填入、XHR 攔截、登入偵測等 7 大通用原則，
+  適用於 Electron、Puppeteer、Playwright、Selenium 等所有瀏覽器自動化框架。
+
+  觸發詞：pportal、國健署篩檢、預防保健查詢、篩檢資格查詢、VoidAPI2、GetBasicData、
+  健保卡掃描、XHR攔截、Session管理、Web自動化整合、外部系統嵌入、
+  pportal.hpa.gov.tw、DOM Polling、表單自動填入、多視窗生命週期、
+  Electron整合、Puppeteer整合、Playwright整合、Selenium整合、
+  成健篩檢查詢、BC肝篩檢查詢、大腸癌篩檢、口腔癌篩檢
 ---
 
 # Web 自動化整合設計模式
@@ -37,6 +46,24 @@ argument-hint: "[query-context]"
 | **Pportal VoidAPI2** | 瀏覽器登入 pportal.hpa.gov.tw | 全項目（10+ 項） | 帳號密碼 + 驗證碼 + 健保卡 | 即時篩檢資格判定 |
 | **Pportal GetBasicData** | 同上（伴隨 VoidAPI2 自動觸發） | 健保卡歷史紀錄 | 同上 | 跨院歷史執行記錄 |
 | **BhpNhi（健保IC卡）** | 本機 CLI 呼叫 BhpNetNhiEx.exe | 成健 + BC肝（2 項） | 健保IC卡讀卡機 + 控制軟體 | 即時資格判定 |
+
+### 選擇決策：該用哪個？
+
+```
+需要查哪些篩檢項目？
+├── 只需成健 + BC肝（2 項）
+│   └── 有讀卡機嗎？
+│       ├── YES → 用 BhpNhi（最快、免登入、免驗證碼）
+│       └── NO → 用 Pportal VoidAPI2（需瀏覽器自動化）
+│
+├── 需要大腸癌、口腔癌、乳攝、HPV、LDCT 等（3+ 項）
+│   └── 必須用 Pportal VoidAPI2（BhpNhi 不支援這些項目）
+│
+└── 需要跨院歷史紀錄（病人在其他醫院做過什麼）
+    └── 必須用 Pportal GetBasicData（本機讀卡只有資格，沒有歷史）
+```
+
+**實務建議**：多數診所同時需要成健 + 其他篩檢項目 → 直接整合 Pportal。BhpNhi 適合只做成健/BC肝的場景，或作為 Pportal 不可用時的 fallback。
 
 ---
 
@@ -315,208 +342,18 @@ cy.wait('@voidApi').then(interception => {
 
 ---
 
-## GetBasicData — 健保卡歷史紀錄 API
+## GetBasicData 與 VoidAPI2 API 摘要
 
-### 端點
+> 完整回傳格式、欄位說明、服務代碼對應表 → `references/pportal-api-reference.md`
 
-```
-POST https://pportal.hpa.gov.tw/Screening/Screening.aspx/GetBasicData
-```
+**GetBasicData** (`POST .../GetBasicData`)：回傳健保卡歷史記錄（`PreventDatas` 陣列），每筆含 `Item`(服務碼)、`ServiceDate`(民國年)、`HospCode`(院所碼)。**先於 VoidAPI2 回傳，需暫存後合併。**
 
-### 用途
+**VoidAPI2** (`POST .../VoidAPI2`)：回傳當前篩檢資格判定（`agreeResult`），值為 `"1"`=符合、`"0"`=不符合、`"?"`=不適用。主要欄位：Adult、BcLiver、Stool、Breast、Oral、Pss、Hpv、Ldct、Gf。
 
-讀取健保卡內儲存的**預防保健服務歷史紀錄**。這些是病患在**所有醫療院所**的執行記錄（跨院），不限於本院。
-
-### 回傳格式
-
-```json
-{
-  "d": {
-    "__type": "UB.Screening.Screening+CardBasicData",
-    "CardID": "000013375450",
-    "Name": "楊伊雅              ",
-    "PId": "I2******76",
-    "EPId": "I200XXX976",
-    "Birthday": "0861227",
-    "Gender": "F",
-    "CardIssueDate": "0920307",
-    "Note": "1",
-    "Age": "29歲",
-    "PreventDatas": [
-      {
-        "Item": "04",
-        "ServiceDate": "1141001",
-        "HospCode": "3522013684",
-        "ServiceCode": "  "
-      },
-      {
-        "Item": "03",
-        "ServiceDate": "1140807",
-        "HospCode": "3522023662",
-        "ServiceCode": "31"
-      },
-      {
-        "Item": "12",
-        "ServiceDate": "1140527",
-        "HospCode": "3522013684",
-        "ServiceCode": "  "
-      }
-    ]
-  }
-}
-```
-
-### CardBasicData 欄位說明
-
-| 欄位 | 說明 | 格式 |
-|------|------|------|
-| `CardID` | 健保卡卡號 | 12 位數字 |
-| `Name` | 姓名（可能含尾隨空白） | 字串，需 trim |
-| `PId` | 身分證字號（遮罩） | `X0******00` |
-| `EPId` | 加密身分證字號 | `X000XXX000` |
-| `Birthday` | 生日 | 7 位民國年 `YYYMMDD` |
-| `Gender` | 性別 | `"M"` 男 / `"F"` 女 |
-| `CardIssueDate` | 發卡日 | 7 位民國年 `YYYMMDD` |
-| `Note` | 卡片註記 | 字串 |
-| `Age` | 年齡（含「歲」字） | 如 `"29歲"` |
-| **`PreventDatas`** | **預防保健歷史紀錄陣列** | 見下方 |
-
-### PreventDatas 陣列格式
-
-每筆記錄代表一次預防保健服務執行：
-
-| 欄位 | 說明 | 格式 |
-|------|------|------|
-| `Item` | 服務代碼（2 碼） | 見「服務代碼對應表」 |
-| `ServiceDate` | 執行日期 | 7 位民國年 `YYYMMDD` |
-| `HospCode` | 執行院所代碼 | 10 位數字 |
-| `ServiceCode` | 項目代碼 | 2 字元（可能為空白） |
-
-**注意**: 同一 Item 可能有多筆記錄（不同日期、不同院所）。通常取最新一筆顯示。
-
-### 與 VoidAPI2 的關係
-
-| 面向 | GetBasicData | VoidAPI2 |
-|------|-------------|----------|
-| 資料性質 | 歷史紀錄（已做過什麼） | 資格判定（現在能做什麼） |
-| 資料範圍 | 跨院（所有醫療院所） | 跨院（國健署整體判定） |
-| 呼叫時序 | 先回傳 | 後回傳 |
-| 資料粒度 | 逐筆（日期、院所） | 逐項（符合/不符合） |
-| 典型用途 | 顯示「健保卡最近記錄」 | 顯示「是否符合資格」 |
-
-### 整合策略
-
-1. 攔截 GetBasicData → 暫存 `PreventDatas`，建立以 `Item` 代碼為 key 的 map（保留每個 Item 最新一筆）
-2. 攔截 VoidAPI2 → 解析 `agreeResult`，同時附帶已暫存的健保卡紀錄一起送出
-3. 前端透過 Item 代碼對應表，將健保卡紀錄匹配到對應的篩檢項目行
+**整合順序**：GetBasicData 先到 → 暫存 `PreventDatas` → VoidAPI2 到達 → 合併 `agreeResult` → 輸出完整結果
 
 ---
 
-## VoidAPI2 — 篩檢資格判定 API
-
-### 端點
-
-```
-POST https://pportal.hpa.gov.tw/Screening/Screening.aspx/VoidAPI2
-```
-
-### 回傳格式
-
-```json
-{
-  "d": {
-    "__type": "UB.Models.QueryResult",
-    "ReturnCode": "0000",
-    "Sex": "F",
-    "Age": "29",
-    "VerifyResult": true,
-    "QueryStatus": true,
-    "Native": "0",
-    "agreeResult": {
-      "Adult": "0",
-      "BcLiver": "0",
-      "Stool": "0",
-      "Breast": "?",
-      "Oral": "0",
-      "Pss": "?",
-      "Hpv": "?",
-      "Ldct": "?",
-      "Gf": "0",
-      "Child1": "0", "Child2": "0", "Child3": "0",
-      "Child4": "0", "Child5": "0", "Child6": "0", "Child7": "0",
-      "SmokingH": "1",
-      "SmokingM": "1",
-      "Prenatal": "1"
-    },
-    "ErrorMsg": "0000",
-    "ResultMsg": "0000000?0?00000000111??0",
-    "BcLiverNeedInformedConsent": false,
-    "AdultNeedInformedConsent": false
-  }
-}
-```
-
-### VoidAPI2 頂層欄位
-
-| 欄位 | 說明 |
-|------|------|
-| `ReturnCode` | `"0000"` 表示成功 |
-| `Sex` | 性別：`"M"` 男 / `"F"` 女（來自健保卡） |
-| `Age` | 年齡（數字字串） |
-| `Native` | 原住民身分：`"0"` 一般、`"1"` 原住民 |
-| `agreeResult` | 各項篩檢資格判定（主要資料） |
-| `BcLiverNeedInformedConsent` | BC 肝是否需知情同意 |
-| `AdultNeedInformedConsent` | 成健是否需知情同意 |
-
-### agreeResult 代碼
-
-VoidAPI2 原始值與標準化後的對應：
-
-| 原始值 | 意義 | 標準化值 | 前端顯示 |
-|--------|------|----------|----------|
-| `"1"` | 符合資格 | `"1"` | ○ 符合 |
-| `"0"` | 不符合資格 | `"2"` | ✗ 不符合 |
-| `"?"` | 不適用/無法判定 | `"3"` | △ 待確認 |
-
-### agreeResult 欄位對應
-
-| API Key | 中文名稱 | 說明 | 性別限制 |
-|---------|---------|------|----------|
-| `Adult` | 成人預防保健 | 成人健康檢查 | 無 |
-| `BcLiver` | BC肝篩檢 | BC 型肝炎篩檢 | 無 |
-| `Stool` | 定量免疫法糞便潛血檢查 | 腸癌篩檢 | 無 |
-| `Breast` | 婦女乳房檢查 | 乳癌篩檢（乳攝影） | 女性 |
-| `Oral` | 口腔黏膜檢查 | 口腔篩檢 | 無 |
-| `Pss` | 婦女子宮頸抹片檢查 | 子宮頸抹片 | 女性 |
-| `Hpv` | 婦女人類乳突病毒檢測服務 | HPV 檢測 | 女性 |
-| `Ldct` | 胸部低劑量電腦斷層檢查 | 低劑量肺部 CT | 無 |
-| `Gf` | 糞便抗原檢測胃幽門螺旋桿菌 | 胃幽門螺旋桿菌 | 無 |
-
----
-
-## 服務代碼對應表（通用）
-
-此對應表適用於 GetBasicData 的 `PreventDatas[].Item` 以及健保卡 RegisterPrevent 記錄：
-
-| 代碼 | 服務名稱 | 常用簡稱 | VoidAPI2 對應 Key |
-|------|----------|----------|-------------------|
-| `01` | 兒童預防保健 | 兒保 | Child1~7 |
-| `02` | 成人預防保健 | 成健 | Adult |
-| `03` | 婦女子宮頸抹片檢查 | 子宮頸抹片 | Pss |
-| `04` | 流行性感冒疫苗 | 流感 | — |
-| `05` | 兒童牙齒預防保健 | 兒牙 | — |
-| `06` | 婦女乳房檢查 | 乳攝影 | Breast |
-| `07` | 定量免疫法糞便潛血檢查 | 腸篩 | Stool |
-| `08` | 口腔黏膜檢查 | 口篩 | Oral |
-| `09` | 兒童常規疫苗 | 兒疫 | — |
-| `10` | 肺炎鏈球菌疫苗 | 肺鏈 | — |
-| `11` | 戒菸服務 | 戒菸 | — |
-| `12` | COVID-19 疫苗 | 新冠 | — |
-| `13` | 婦女人類乳突病毒檢測 | HPV | Hpv |
-| `14` | 低劑量電腦斷層 | LDCT | Ldct |
-| `15` | 胃幽門螺旋桿菌 | 幽桿 | Gf |
-
-**注意**: 流感(04)、肺鏈(10)、新冠(12) 等疫苗項目在 GetBasicData 有紀錄，但 VoidAPI2 的 agreeResult 中沒有對應欄位（疫苗資格不由 pportal 判定）。
 
 ---
 
@@ -658,139 +495,127 @@ ASP.NET 的 `__doPostBack` 機制依賴 JavaScript 事件。直接設定 `input.
 
 ---
 
-## Polling 失敗恢復模式
+## Polling 失敗恢復與 Session 管理
 
-### 問題場景
+XHR Polling 失敗時採用**指數退避重試**（2s → 4s → 8s）。ASP.NET Session Cookie 預設 20 分鐘過期（sliding），偵測方式：URL 包含 `Login.aspx`、HTTP 302/401、或 body 含 `txtCaptcha`。
 
-XHR Polling（等待 VoidAPI2 / GetBasicData 回傳）可能因網路不穩、伺服器超時或頁面導航中斷而失敗。
+> Retry 函式模板、Session 過期處理程式碼、稽核日誌格式 → `references/session-management.md`
 
-### Retry 策略
+---
 
-| 策略 | 適用場景 | 實作 |
-|------|---------|------|
-| 固定間隔重試 | 短暫斷線 | 每 2 秒重試，最多 5 次 |
-| 指數退避 | 伺服器過載 | 2s → 4s → 8s → 16s，最多 4 次 |
-| 帶抖動的指數退避 | 多用戶同時操作 | 基礎指數退避 + random(0-1s) |
+## 邊界與失敗模式
 
-### Retry 函式模板
+**這個技能對應的是「設計模式知識」，不是執行層：**
+
+| 情況 | 為什麼失敗 | 實際症狀 |
+|------|-----------|---------|
+| 國健署改版 pportal DOM 結構 | 所有 selector 和 API endpoint 都可能變 | 登入 modal 找不到、VoidAPI2 格式不同 |
+| ASP.NET Session 不穩定 | 閒置超過 20 分鐘自動登出 | 下一個查詢突然需要重新登入 |
+| 驗證碼無法自動化 | 圖形驗證碼設計目的就是阻擋自動化 | 技能設計中「等人工輸入」是預期行為，不是缺陷 |
+| 子視窗無法攔截 XHR | 忘記對子視窗也設定 CDP / response listener | GetBasicData 或 VoidAPI2 無法被攔截 |
+| GetBasicData 先到、VoidAPI2 後到，但程式碼只等一個 | 時序問題：兩個都要攔截 | 病患資料只有一半 |
+
+### 錯誤恢復決策樹
+
+查詢失敗時，按以下順序診斷：
+
+```
+查詢失敗
+├── HTTP 302 / URL 含 Login.aspx / body 含 txtCaptcha？
+│   └── YES → Session 過期
+│       ├── 嘗試 1：重用 Session Cookie，自動導回查詢頁
+│       ├── 嘗試 2：保留 partition/userDataDir，重新載入首頁
+│       └── 嘗試 3：需人工重新登入（驗證碼）→ 通知操作者
+│
+├── selector 找不到元素（#ctl00_txtAccount 等）？
+│   └── YES → DOM 結構可能已改版
+│       ├── 嘗試 1：檢查元素是否在 iframe 內（國健署偶爾加 iframe 包裝）
+│       ├── 嘗試 2：用 document.querySelectorAll('[id*=txtAccount]') 模糊搜尋
+│       └── 嘗試 3：記錄新 DOM 結構，更新 selector 對應表
+│
+├── XHR 攔截到但 response body 為空或格式異常？
+│   └── YES → API 回傳格式變更
+│       ├── 嘗試 1：印出完整 response body 比對欄位名稱是否改名
+│       ├── 嘗試 2：檢查 Content-Type 是否從 JSON 變 XML
+│       └── 嘗試 3：在測試環境重新抓取完整回傳格式，更新解析邏輯
+│
+└── VoidAPI2 / GetBasicData 完全攔截不到？
+    └── 檢查子視窗是否正確設定 listener（原則 2 + 原則 6）
+        ├── Electron：CDP session 是否綁定到正確的 webContents
+        ├── Puppeteer/Playwright：page.on('response') 是否在 newPage 事件後設定
+        └── 如果子視窗 URL 變更，更新 URL pattern 匹配邏輯
+```
+
+**恢復後必做**：每次手動恢復後，更新整合健康檢查清單中的對應項目通過標準。
+
+**已知的系統性風險：**
+- pportal 是外部系統，任何改版都可能讓現有整合失效，需要主動維護
+- 這個技能提供的 DOM selector 是基於特定時間點的觀察，不保證永久有效
+
+## 成功的樣子
+
+**完整整合驗證流程（按順序）：**
+
+1. Session 層級：登入後 30 分鐘內不需重新登入 ✓
+2. XHR 攔截：GetBasicData 和 VoidAPI2 都被攔截到 ✓
+3. 資料完整性：`agreeResult` 包含至少 9 個欄位（Adult, BcLiver, Stool... 等）✓
+4. 時序正確：GetBasicData 先到，VoidAPI2 後到，兩者合併後再輸出 ✓
+5. 錯誤處理：測試 Session 過期情境，確認自動重新登入流程能觸發 ✓
+
+---
+
+## 整合健康檢查清單
+
+國健署會不定期更新 pportal 系統。每次更新或定期（每月建議一次）執行以下檢查：
+
+### 自動化可驗證項目
+
+| # | 檢查項目 | 驗證方式 | 通過標準 |
+|---|---------|---------|---------|
+| 1 | 登入頁面載入 | 訪問首頁 URL，檢查 HTTP 200 | 頁面包含「服務登入」文字 |
+| 2 | 登入 Modal DOM | Polling `#ctl00_txtAccount` | 10 秒內找到元素 |
+| 3 | 帳號/密碼欄位 | Placeholder 匹配 `請輸入帳號`/`請輸入密碼` | 精確匹配 |
+| 4 | 登入按鈕 | `#ctl00_lbtnLogin` 存在 | 元素可點擊 |
+| 5 | 登入成功偵測 | 頁面含「登出」或功能入口連結 | 30 秒內偵測到 |
+| 6 | 子視窗開啟 | `window.open` 攔截 | 取得子視窗引用 |
+| 7 | GetBasicData XHR | 攔截 URL 含 `GetBasicData` | 回傳含 `PreventDatas` |
+| 8 | VoidAPI2 XHR | 攔截 URL 含 `VoidAPI2` | 回傳含 `agreeResult` |
+| 9 | agreeResult 欄位完整 | 檢查 9 個必要欄位 | Adult, BcLiver, Stool, Breast, Oral, Pss, Hpv, Ldct, Gf 都存在 |
+| 10 | 時序正確 | GetBasicData 回傳時間 < VoidAPI2 回傳時間 | GetBasicData 先到 |
+
+### 手動驗證項目（需人工介入）
+
+| # | 檢查項目 | 方法 |
+|---|---------|------|
+| 11 | 驗證碼圖片 | 確認驗證碼圖片可顯示、4 碼輸入欄位正常 |
+| 12 | 實際查詢結果 | 用已知病患查詢，比對結果與預期 |
+| 13 | Session 持久性 | 登入後等 15 分鐘，確認不需重新登入 |
+
+### 更新後快速驗證指令（概念）
 
 ```javascript
-// Playwright / Puppeteer 通用
-async function waitForXhrWithRetry(page, urlPattern, options = {}) {
-  const { maxRetries = 3, baseDelay = 2000, timeout = 30000 } = options;
+// 自動化檢查腳本骨架（Playwright 版）
+async function healthCheck(page) {
+  // 1. 首頁載入
+  await page.goto('https://pportal.hpa.gov.tw/Web/Notice.aspx');
+  assert(await page.textContent('body')).includes('服務登入');
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await page.waitForResponse(
-        res => res.url().includes(urlPattern) && res.status() === 200,
-        { timeout }
-      );
-      return await response.json();
-    } catch (err) {
-      if (attempt === maxRetries) throw err;
-      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
-      console.log(`Retry ${attempt + 1}/${maxRetries} after ${Math.round(delay)}ms`);
-      await page.waitForTimeout(delay);
+  // 2. 登入 Modal DOM 結構
+  await page.click('text=服務登入');
+  const account = await page.waitForSelector('#ctl00_txtAccount', { timeout: 10000 });
+  assert(await account.getAttribute('placeholder')).toBe('請輸入帳號');
 
-      // 可選：重新觸發請求（如重新點擊查詢按鈕）
-      // await page.click('#queryButton');
-    }
-  }
+  // 3. XHR 端點存在性（需實際登入後驗證）
+  // ... 後續需要人工輸入驗證碼
+  console.log('DOM 結構檢查通過，XHR 驗證需手動完成');
 }
-```
-
-### 失敗後的恢復流程
-
-```
-Polling 失敗
-├── HTTP 5xx → 指數退避重試
-├── Timeout → 檢查頁面是否仍在預期狀態
-│   ├── 頁面正常 → 重新觸發查詢
-│   └── 頁面已跳轉 → 重新導航至查詢頁
-├── 網路斷線 → 等待網路恢復後重試
-└── 所有重試失敗 → 記錄錯誤、通知操作者
 ```
 
 ---
 
-## Session 過期處理
+## 參考文件
 
-### Cookie TTL 監控
-
-Pportal 的 ASP.NET Session Cookie 預設 20 分鐘過期。
-
-| Cookie | 用途 | TTL | 刷新條件 |
-|--------|------|-----|---------|
-| `ASP.NET_SessionId` | 會話識別 | 20 分鐘（sliding） | 任何 HTTP 請求 |
-| `.ASPXAUTH` | 身份驗證 | 取決於伺服器設定 | 登入時設定 |
-
-### 過期偵測
-
-```javascript
-// 監控 Session 狀態
-function isSessionExpired(response) {
-  // 方式 1：被重導到登入頁
-  if (response.url().includes('Login.aspx')) return true;
-
-  // 方式 2：回傳特定錯誤碼
-  if (response.status() === 302 || response.status() === 401) return true;
-
-  // 方式 3：回傳 HTML 包含登入表單
-  const body = await response.text();
-  if (body.includes('txtCaptcha') || body.includes('btnLogin')) return true;
-
-  return false;
-}
-```
-
-### 自動重新登入流程
-
-```
-Session 過期偵測
-├── 保存當前工作狀態（已查詢的病患ID、已完成的項目）
-├── 重新導航至登入頁
-├── 自動填入帳號密碼
-├── 處理驗證碼（需人工介入或 OCR）
-├── 登入成功 → 恢復到之前的工作狀態
-└── 登入失敗 → 通知操作者
-```
-
----
-
-## 稽核日誌記錄指南
-
-### 應記錄的事件
-
-| 事件類型 | 記錄內容 | 重要性 |
-|---------|---------|--------|
-| 登入/登出 | 時間、帳號、IP、成功/失敗 | 高 |
-| 病患資料查詢 | 時間、操作者、病患 ID、查詢類型 | 高 |
-| 篩檢結果讀取 | 時間、操作者、病患 ID、篩檢項目 | 高 |
-| 系統錯誤 | 時間、錯誤類型、堆疊追蹤 | 中 |
-| Session 事件 | 建立、過期、刷新 | 低 |
-
-### 日誌格式
-
-```json
-{
-  "timestamp": "2024-03-15T10:30:00+08:00",
-  "level": "INFO",
-  "event": "patient_query",
-  "actor": "operator_001",
-  "patient_id": "A123456789",
-  "action": "VoidAPI2_request",
-  "result": "success",
-  "duration_ms": 2350,
-  "metadata": {
-    "screening_items_count": 5,
-    "session_age_minutes": 12
-  }
-}
-```
-
-### 隱私注意事項
-
-- 日誌中的身分證字號必須遮罩（如 `A1234*****`）
-- 不記錄篩檢結果的具體數值
-- 日誌保留期限依機構規定（建議至少 3 年）
-- 日誌存取需有權限控制
+| 文件 | 內容 |
+|------|------|
+| `references/pportal-api-reference.md` | GetBasicData/VoidAPI2 完整回傳格式、欄位說明、服務代碼對應表 |
+| `references/session-management.md` | Polling Retry 模板、Session 過期偵測、稽核日誌格式 |

@@ -184,8 +184,9 @@ ORDER BY o.TBKDT DESC;
 ```
 
 ```sql
--- 統計本月 BC 肝篩檢登記量
-SELECT COUNT(DISTINCT KCSTMR) as 篩檢人次
+-- 統計本月成人健檢登記量（注意：這是成健，不是 BC 肝）
+-- BC 肝篩檢透過 RegisterBcLiver() API 登記，不產生獨立的 LISRS 代碼
+SELECT COUNT(DISTINCT KCSTMR) as 成健人次
 FROM CO03L
 WHERE DATE LIKE '11502%'       -- 民國115年2月
   AND LISRS IN ('3D','21','22','3E','23','24');

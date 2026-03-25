@@ -1,9 +1,13 @@
 ---
 name: nhi-ic-card
-description: 健保IC卡讀卡整合技能。涵蓋 BhpNhi.dll API 開發、回應碼解碼、成健/BC肝篩檢工作流程、IC卡欄位結構、資料上傳格式2.0。當涉及健保卡讀卡、篩檢資格查詢、IC卡欄位、或上傳XML時自動啟用。
-version: 2.0.0
-source: 健保署元件套用說明 + 測試說明 + IC卡存放內容規格 + 上傳格式2.0作業說明
-tags: [healthcare, NHI, IC-card, BhpNhi, dotnet, screening, upload-format, Taiwan]
+description: |
+  健保IC卡讀卡整合技能。涵蓋 BhpNhi.dll API 開發、回應碼解碼、成健/BC肝篩檢工作流程、
+  IC卡欄位結構、資料上傳格式2.0。支援 .NET、Node.js、Python 等多語言整合方案。
+
+  觸發詞：BhpNhi.dll、CsHis.dll、健保卡讀卡、健保IC卡、IC卡讀卡機、
+  BhpNetNhiEx、健保元件、成人健檢API、BC肝篩檢、篩檢資格查詢、
+  讀卡API、健保卡欄位、上傳格式2.0、XML上傳、健保IC整合、
+  虛擬健保卡、HCA晶片卡、讀卡機整合、多讀卡機、GUID token
 ---
 
 # Skill: 健保IC卡整合開發參考
@@ -127,6 +131,8 @@ var bhpNhi = new BhpNhi.Bhp();
 
 ## 篩檢資格規則
 
+> **權威來源**：`references/screening-workflow.md` 是篩檢規則的唯一維護點。以下為摘要，如有出入以該文件為準。
+
 ### 成人預防保健
 
 | 對象 | 年齡 | 頻率 |
@@ -161,6 +167,66 @@ var bhpNhi = new BhpNhi.Bhp();
 - **「這個代碼什麼意思」「病人符不符合資格」「登記流程」** → 讀取 `references/screening-workflow.md`
 - **「IC卡存了什麼」「欄位格式」「RegisterPrevent 怎麼解」** → 讀取 `references/card-fields.md`
 - **「上傳 XML 怎麼寫」「異常上傳」「補卡」「就醫類別」** → 讀取 `references/upload-format.md`
+
+---
+
+## 最常見的整合模式
+
+### 模式 1：門診掛號流程中自動讀卡+查資格
+
+```csharp
+// 病患插卡 → 讀卡 → 查成健/BC肝 → 顯示結果
+public async Task<ScreeningResult> OnCardInserted()
+{
+    var bhp = new BhpNhi.Bhp();
+
+    // Step 1: 讀卡（必須先做）
+    var personJson = bhp.GetPersonData();
+    var person = JsonSerializer.Deserialize<PersonResponse>(personJson);
+    if (!person.Status) return ScreeningResult.Error(person.Code);
+
+    // Step 2: 查資格
+    var validJson = bhp.ValidAll();
+    var valid = JsonSerializer.Deserialize<ApiResponse>(validJson);
+    if (!valid.Status) return ScreeningResult.Error(valid.Code);
+
+    // Step 3: 解碼 XXYY-ZZ
+    return ParseScreeningCode(valid.Code, person.Person);
+}
+
+private ScreeningResult ParseScreeningCode(string code, Person patient)
+{
+    // code = "0101-00"
+    var parts = code.Split('-');
+    var xxYY = parts[0]; // "0101"
+    var zz = parts[1];   // "00"
+
+    return new ScreeningResult
+    {
+        BcLiver = xxYY[..2] == "01",     // BC肝符合
+        Adult = xxYY[2..] == "01",        // 成健符合
+        IsAboriginal = zz == "01",        // 原住民
+        PatientName = patient.Pid         // 身分證
+    };
+}
+```
+
+### 模式 2：批次查詢（多位病患連續讀卡）
+
+```csharp
+// 重點：每次換卡都要重新 GetPersonData()
+foreach (var patient in waitingList)
+{
+    Console.WriteLine($"請插入 {patient.Name} 的健保卡...");
+    WaitForCardInsert(); // 等待讀卡機偵測到卡片
+
+    var result = await OnCardInserted();
+    results.Add(result);
+
+    Console.WriteLine($"請取出健保卡");
+    WaitForCardRemove(); // 等待卡片移除
+}
+```
 
 ---
 
@@ -220,7 +286,7 @@ public class MockBhpNhi : IBhpNhi
         Status = true,
         Person = new {
             HospId = "0000000000",
-            SamId = "0000000000000000",
+            SamId = "000000000000",
             CardId = "000000000000",
             Pid = "A123456789",
             Birth = "0761015",
@@ -296,158 +362,15 @@ public void ValidAll_ShouldParseCorrectly(string code, bool adultEligible, bool 
 
 ## 跨平台整合指引
 
-BhpNhi.dll 為 .NET Framework / .NET 元件，其他語言需透過中介方式存取。以下為常見整合方案。
+BhpNhi.dll 為 .NET 元件，其他語言需透過中介方式存取。**建議架構：將 DLL 包裝成 REST API**（ASP.NET Minimal API，`localhost:5100`），其他語言透過 HTTP 呼叫。
 
-### REST API 包裝
+| 語言 | 推薦方式 | 備選方式 |
+|------|---------|---------|
+| Node.js | HTTP (axios) | edge-js、child_process |
+| Python | HTTP (requests) | pythonnet、subprocess |
+| Docker | 讀卡服務在 Host 跑 REST API | 不建議直接容器化（USB 限制） |
 
-將 DLL 功能包裝成 HTTP API，是最通用的跨語言方案。
-
-**ASP.NET Minimal API 範例**（.NET 6+）：
-
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton<IBhpNhi, BhpNhiWrapper>();
-
-var app = builder.Build();
-
-app.MapGet("/api/card/status", (IBhpNhi bhp) =>
-    Results.Ok(new { status = bhp.GetStatus() }));
-
-app.MapPost("/api/card/read", (IBhpNhi bhp) =>
-{
-    var json = bhp.GetPersonData();
-    return Results.Content(json, "application/json");
-});
-
-app.MapPost("/api/screening/check", (IBhpNhi bhp) =>
-{
-    var json = bhp.ValidAll();
-    return Results.Content(json, "application/json");
-});
-
-app.MapPost("/api/screening/register-bcliver", (IBhpNhi bhp) =>
-{
-    var json = bhp.RegisterBcLiver();
-    return Results.Content(json, "application/json");
-});
-
-app.MapPost("/api/screening/cancel-bcliver", (IBhpNhi bhp) =>
-{
-    var json = bhp.CancelBcLiver();
-    return Results.Content(json, "application/json");
-});
-
-app.Run("http://localhost:5100");
-```
-
-部署時建議：
-- 僅綁定 `localhost` 或內網 IP，避免暴露於外網
-- 加入 API Key 驗證中介軟體
-- 記錄所有讀卡操作的稽核日誌
-
-### Node.js 整合
-
-**方式一：HTTP 呼叫**（推薦，搭配上述 REST API）：
-
-```javascript
-const axios = require('axios');
-const CARD_API = 'http://localhost:5100';
-
-async function readCard() {
-    const { data } = await axios.post(`${CARD_API}/api/card/read`);
-    return data;
-}
-
-async function checkScreening() {
-    const { data } = await axios.post(`${CARD_API}/api/screening/check`);
-    return data;
-}
-```
-
-**方式二：edge-js 直接呼叫 .NET**（需 Node.js 與 .NET 同機）：
-
-```javascript
-const edge = require('edge-js');
-
-const getPersonData = edge.func({
-    assemblyFile: 'path/to/BhpNhiWrapper.dll',
-    typeName: 'BhpNhiWrapper.Bridge',
-    methodName: 'GetPersonData'
-});
-
-getPersonData(null, (error, result) => {
-    if (error) throw error;
-    console.log(JSON.parse(result));
-});
-```
-
-**方式三：child_process 呼叫 CLI**：
-
-```javascript
-const { execSync } = require('child_process');
-const result = execSync('dotnet run --project CardReaderCli -- read-card', { encoding: 'utf-8' });
-const data = JSON.parse(result);
-```
-
-### Python 整合
-
-**方式一：HTTP 呼叫**（推薦）：
-
-```python
-import requests
-
-CARD_API = "http://localhost:5100"
-
-def read_card():
-    resp = requests.post(f"{CARD_API}/api/card/read")
-    return resp.json()
-
-def check_screening():
-    resp = requests.post(f"{CARD_API}/api/screening/check")
-    return resp.json()
-```
-
-**方式二：pythonnet 直接載入 .NET DLL**：
-
-```python
-import clr
-clr.AddReference(r"C:\path\to\BhpNhi.dll")
-from BhpNhi import Bhp
-
-bhp = Bhp()
-person_json = bhp.GetPersonData()
-```
-
-> **注意**：pythonnet 需安裝對應的 .NET Runtime，且 32/64 位元需與 DLL 一致。
-
-**方式三：subprocess 呼叫 CLI**：
-
-```python
-import subprocess, json
-
-result = subprocess.run(
-    ["dotnet", "run", "--project", "CardReaderCli", "--", "read-card"],
-    capture_output=True, text=True
-)
-data = json.loads(result.stdout)
-```
-
-### Docker 容器化考量
-
-由於讀卡機為 USB 硬體裝置，Docker 容器化有以下限制與注意事項：
-
-1. **USB 裝置傳遞**：需使用 `--device` 參數將讀卡機裝置傳入容器
-   ```bash
-   docker run --device=/dev/bus/usb/001/003 my-card-reader-app
-   ```
-
-2. **Windows 容器**：在 Windows 環境建議使用 Windows Container 或直接在 Host 執行讀卡服務，Linux 容器無法存取 Windows 的 USB 裝置
-
-3. **建議架構**：將系統拆為兩層
-   - **讀卡服務**：直接在有讀卡機的 Windows 主機上執行（REST API 模式）
-   - **業務邏輯**：容器化部署，透過 HTTP 呼叫讀卡服務
-
-4. **健保卡控制軟體**：健保署的控制軟體 6.0 需安裝在有讀卡機的主機上，無法容器化
+> 完整程式碼範例（ASP.NET Minimal API、Node.js 三種方式、Python 三種方式、Docker 架構）→ `references/cross-platform-integration.md`
 
 ---
 
@@ -627,6 +550,78 @@ public class MultiReaderManager
 
 ---
 
+## 問題排查決策樹
+
+當讀卡或查詢出問題時，按以下流程逐步排除：
+
+```
+GetPersonData() 回傳什麼？
+  │
+  ├── 例外（Exception）
+  │     ├── DllNotFoundException → DLL 路徑不對或被 Windows 封鎖
+  │     │     → 確認 .csproj 參考路徑、右鍵 DLL → 解除封鎖
+  │     ├── BadImageFormatException → 32/64 位元不符
+  │     │     → 專案改為 x86 或確認 DLL 位元數
+  │     └── 其他例外 → 主控台可能沒啟動
+  │           → 確認桌面有開啟「健保卡控制軟體主控台」
+  │
+  ├── Status = false
+  │     ├── Code = "9999" → Token 失敗
+  │     │     ├── 是否第一次呼叫？ → 可能網路不通（健保署伺服器）
+  │     │     └── 之前成功過？ → Session 逾時，重啟主控台
+  │     ├── Code = "9998" → 硬體驗證失敗
+  │     │     ├── SAM 卡有插好？ → 重插 SAM 卡
+  │     │     ├── 健保卡有插？ → 插卡後再試
+  │     │     └── 讀卡機在裝置管理員有驚嘆號？ → 重裝驅動
+  │     └── Code = "9001"/"9002" → 資料格式問題
+  │           → 健保卡可能有損壞，換張卡試試
+  │
+  └── Status = true → 讀卡成功！
+        │
+        接著 ValidAll() 回傳什麼？
+        ├── Status = true, Code = "XXYY-ZZ" → 正常，解碼 Code
+        └── Status = false → Token 可能在中間過期
+              → 重新呼叫 GetPersonData() 後再試
+```
+
+**最常見的 3 個坑（依發生頻率排序）：**
+
+1. **主控台沒開**：每次開機都要手動啟動，或設為開機自啟
+2. **DLL 被 Windows 封鎖**：從網路下載的 DLL 預設被封鎖，右鍵 → 內容 → 勾選「解除封鎖」
+3. **GetPersonData 沒先呼叫就直接 ValidAll**：所有查詢操作都依賴 GetPersonData 建立的 Token 通道
+
+---
+
+## 邊界與失敗模式
+
+**這個技能誠實的邊界：**
+
+| 情況 | 為什麼失敗 | 怎麼辨認 |
+|------|-----------|---------|
+| DLL 路徑或版本不對 | BhpNhi.dll 依賴特定版本的 CsHis.dll + 作業系統版本 | `DllNotFoundException` 或 `BadImageFormatException` |
+| 硬體環境缺少 | 無讀卡機、SAM 卡未插入、控制軟體未啟動 | 9998 或 9999 錯誤碼 |
+| 健保署後端服務中斷 | API 呼叫依賴健保署伺服器 | `Status=false` 但本機硬體正常 |
+| 同時處理多病患 | BhpNhi.dll 設計是單次單卡，無非同步 API | 序列化排隊讀卡，不能平行化 |
+| 在 CI/CD 環境執行 | 需要實體硬體 | 必須切換 Mock 模式 |
+
+**這個技能不能告訴你的事：**
+- 具體的網路防火牆規則（各院所環境不同）
+- SAM 卡到期日（需聯繫健保署）
+- 健保署 API 目前的服務狀態（需要查健保署公告）
+
+## 成功的樣子
+
+**本機環境就緒確認流程（照順序做）：**
+
+1. `GetStatus()` 回傳正常狀態字串 ✓
+2. 插入有效健保卡後，`GetPersonData()` 回傳 `Status=true` ✓
+3. `ValidAll()` 回傳 `XXYY-ZZ` 格式且可正確解碼 ✓
+4. Mock 測試：`0101-00` 解碼為「成健符合＋BC肝符合＋一般身分」✓
+
+每個步驟成功才往下走。任何步驟失敗，先找根本原因再繼續。
+
+---
+
 ## Token 生命週期表
 
 ### 各類 Token 的有效期
@@ -650,3 +645,16 @@ Token 監控流程：
 │   └── 403 → 權限問題，通知管理者
 └── 每日：記錄 Token 使用統計（成功/失敗次數）
 ```
+
+---
+
+## 相關插件
+
+本插件與以下插件形成完整的臨床工作流：
+
+| 工作流步驟 | 插件 | 說明 |
+|-----------|------|------|
+| 1. 讀卡取得身份 | **本插件（nhi-ic-card）** | GetPersonData → ValidAll |
+| 2. 查詢國健署篩檢資格 | **nhs-pportal-screening** | 用身分證號到 pportal 查全項目篩檢資格 |
+| 3. 查詢 HIS 歷史紀錄 | **vision-database** | 用 KCSTMR 查詢就診、處方、檢驗歷史 |
+| 4. 計算健康風險 | **nhri-risk-plugin** | 用檢驗數值計算 10 年心血管風險 |

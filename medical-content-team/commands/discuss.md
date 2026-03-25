@@ -18,11 +18,26 @@
    ```
    mkdir -p record/$ARGUMENTS/作品
    mkdir -p record/$ARGUMENTS/作品/assets
+   mkdir -p record/$ARGUMENTS/作品/sources
    mkdir -p record/$ARGUMENTS/會議記錄
    ```
-3. **建立團隊**：使用 TeamCreate 建立團隊，團隊名稱使用題目的簡短英文代稱（例如「糖尿病預防」→ `med-diabetes-prevention`，「React 效能優化」→ `tech-react-perf`）
-4. **載入領域配置**：讀取 `references/domain-presets.md` 取得對應領域的預設配置（證據標準、免責聲明、目標讀者、審查重點等），讀取 `references/role-mapping.md` 確認各角色的領域對應名稱。
-5. **建立 PRD**：在 `record/$ARGUMENTS/會議記錄/PRD.md` 寫入內容需求文件，根據所選領域調整內容：
+3. **記錄原始素材清單**：掃描使用者提供的所有原始素材檔案（論文 PDF、參考資料、圖片等），將清單寫入 `record/$ARGUMENTS/會議記錄/source_manifest.md`：
+   ```markdown
+   # 原始素材清單
+   建立時間：[timestamp]
+
+   ## 待歸檔檔案
+   - [ ] /path/to/paper1.pdf
+   - [ ] /path/to/reference.md
+   - [ ] /path/to/image.png
+
+   ## 歸檔目標目錄
+   record/$ARGUMENTS/作品/sources/
+   ```
+   > **重要**：這份清單是 Task 16 歸檔時的唯一依據。如果使用者在討論過程中追加素材，也必須更新此清單。
+4. **建立團隊**：使用 TeamCreate 建立團隊，團隊名稱使用題目的簡短英文代稱（例如「糖尿病預防」→ `med-diabetes-prevention`，「React 效能優化」→ `tech-react-perf`）
+5. **載入領域配置**：讀取 `references/domain-presets.md` 取得對應領域的預設配置（證據標準、免責聲明、目標讀者、審查重點等），讀取 `references/role-mapping.md` 確認各角色的領域對應名稱。
+6. **建立 PRD**：在 `record/$ARGUMENTS/會議記錄/PRD.md` 寫入內容需求文件，根據所選領域調整內容：
    - 題目名稱
    - **內容領域**：`$DOMAIN`
    - **目標讀者**：根據領域配置設定（醫療：醫療同業 + 高知識份子 / 科技：開發者 + 技術管理者 / 財經：投資人 + 財務專業人員 / 法律：一般民眾 + 法律從業者 / 行銷：目標客群 + 行銷從業者）
@@ -36,7 +51,7 @@
 
 ### Phase 2：建立任務清單
 
-使用 TaskCreate 建立以下 15 個任務，並用 TaskUpdate 設定依賴關係（addBlockedBy）。
+使用 TaskCreate 建立以下 16 個任務，並用 TaskUpdate 設定依賴關係（addBlockedBy）。
 
 > **領域適配**：以下任務描述以醫療領域為範例。其他領域請將「醫學準確性」替換為對應的審查術語（參見 `references/role-mapping.md`），將「醫學記者」替換為對應的撰稿人角色名稱。
 
@@ -57,6 +72,7 @@
 | 13 | [Round 3] 最終優化與平衡：流量獵人主導包裝優化 + 撰稿人配合調整 | content-writer + traffic-hunter | 12 |
 | 14 | [Round 4] 最終審定：全員最終審查，產出 final.md | all | 13 |
 | 15 | [Post-R4] 素材整理：系統性擷取/整理文章引用的關鍵圖表與素材，建立 asset_manifest.md | content-writer (medical-journalist) | 14 |
+| 16 | [Post-R4] 原始素材歸檔：讀取 source_manifest.md，將所有原始素材移動到 sources/ 目錄 | facilitator (lead) | 15 |
 
 ### 領域預設快速參照
 
@@ -175,6 +191,25 @@ prompt 要點：
 - 讀取 .claude/agents/traffic_hunter_agent.md 了解你的完整角色定義
 ```
 
+### Phase 3.5：Pre-Discussion Quality Gate
+
+在 spawn teammates 之後、正式開始 Round 0 之前，主持人快速確認：
+
+```
+□ 題目是否明確到可以寫一篇 800+ 字的文章？
+  → 太窄（如「某個特定病人該怎麼辦」）→ 請使用者泛化
+  → 太廣（如「談談健康」）→ 請使用者聚焦
+
+□ 領域是否正確設定？
+  → 跨領域主題（如「糖尿病飲食」= medical + nutrition）→ 選主要焦慮的領域
+
+□ 這個題目真的需要團隊討論嗎？
+  → 如果是事實性查詢（「HbA1c 正常值是多少」）→ 不需要，直接回答
+  → 如果是有爭議/多觀點的主題 → 繼續討論流程
+```
+
+不通過 → 用 AskUserQuestion 釐清，不要硬做。
+
 ### Phase 4：啟動 Delegate Mode
 
 所有 teammate spawn 後，你（主持人/Team Lead）進入協調模式：
@@ -191,6 +226,8 @@ prompt 要點：
    - 更新 `會議記錄/decision_log.md`
    - 使用 TaskUpdate 完成 Task 6，解除 Task 7 的阻塞
 5. **重複 Round 2-4**：按相同模式推進
+6. **討論停滯處理**：如果討論卡住（全員同意、兩人僵持、或記者收到矛盾指令），
+   參照 SKILL.md 的「討論停滯恢復協議」處理。不要讓討論空轉超過 2 輪同一議題。
 
 ### 通訊規則
 
@@ -212,14 +249,28 @@ prompt 要點：
 
 ### 完成條件
 
-當 Task 15（圖表擷取）完成後：
-1. 確認 `record/$ARGUMENTS/作品/final.md` 已產出
-2. 確認所有會議記錄已完整
-3. 確認 `record/$ARGUMENTS/作品/assets/asset_manifest.md` 已建立
-4. **歸檔原始素材**：將使用者提供的原始素材（論文 PDF、參考資料等）移動到 `record/$ARGUMENTS/作品/sources/` 目錄（先 mkdir -p 建立目錄，再 mv 移動檔案）
-5. 向所有 teammate 發送 shutdown_request
-6. 使用 TeamDelete 清理團隊
-7. 向使用者報告完成狀態，提供 final.md 的位置
+當 Task 16（原始素材歸檔）完成後，依序執行以下 checklist：
+
+```
+□ 1. 歸檔原始素材（最重要！）
+     → 讀取 record/$ARGUMENTS/會議記錄/source_manifest.md
+     → 逐一將清單中的檔案 mv 到 record/$ARGUMENTS/作品/sources/
+     → 更新 source_manifest.md，將 [ ] 改為 [x]
+     → 如果某個檔案已不存在，在 manifest 中標註「⚠ 找不到」
+     → 全部完成後向使用者報告歸檔結果
+
+□ 2. 確認 record/$ARGUMENTS/作品/final.md 已產出
+□ 3. 確認所有會議記錄已完整（PRD.md, round1-4.md, decision_log.md）
+□ 4. 確認 record/$ARGUMENTS/作品/assets/asset_manifest.md 已建立
+□ 5. 向所有 teammate 發送 shutdown_request
+□ 6. 使用 TeamDelete 清理團隊
+□ 7. 向使用者報告完成狀態：
+     - final.md 的位置
+     - 歸檔了哪些原始素材
+     - 歸檔失敗的檔案（如有）
+```
+
+> **⚠ 防遺漏機制**：Task 16 是正式任務，不是可選步驟。如果 Task 16 未完成，整個流程不算結束。
 
 ---
 
